@@ -1,109 +1,87 @@
-import os
-import random
-from azure.storage.blob import BlobServiceClient
-
-from azure.storage.filedatalake import (
-    DataLakeServiceClient,
-)
-SOURCE_FILE = 'adult.names'
-
-def upload_download_sample(filesystem_client):
-    # create a file before writing content to it
-    file_name = "testfile"
-    print("Creating a file named '{}'.".format(file_name))
-    # [START create_file]
-    file_client = filesystem_client.get_file_client(file_name)
-    file_client.create_file()
-    # [END create_file]
-
-    # prepare the file content with 4KB of random data
-    file_content = get_random_bytes(4*1024)
-
-    # append data to the file
-    # the data remain uncommitted until flush is performed
-    print("Uploading data to '{}'.".format(file_name))
-    file_client.append_data(data=file_content[0:1024], offset=0, length=1024)
-    file_client.append_data(data=file_content[1024:2048], offset=1024, length=1024)
-    # [START append_data]
-    file_client.append_data(data=file_content[2048:3072], offset=2048, length=1024)
-    # [END append_data]
-    file_client.append_data(data=file_content[3072:4096], offset=3072, length=1024)
-
-    # data is only committed when flush is called
-    file_client.flush_data(len(file_content))
-
-    # Get file properties
-    # [START get_file_properties]
-    properties = file_client.get_file_properties()
-    # [END get_file_properties]
-
-    # read the data back
-    print("Downloading data from '{}'.".format(file_name))
-    # [START read_file]
-    download = file_client.download_file()
-    downloaded_bytes = download.readall()
-    # [END read_file]
-
-    # verify the downloaded content
-    if file_content == downloaded_bytes:
-        print("The downloaded data is equal to the data uploaded.")
-    else:
-        print("Something went wrong.")
-
-    # Rename the file
-    # [START rename_file]
-    new_client = file_client.rename_file(file_client.file_system_name + '/' + 'newname')
-    # [END rename_file]
-
-    # download the renamed file in to local file
-    with open(SOURCE_FILE, 'wb') as stream:
-        download = new_client.download_file()
-        download.readinto(stream)
-
-    # [START delete_file]
-    new_client.delete_file()
-    # [END delete_file]
-
-# help method to provide random bytes to serve as file content
-def get_random_bytes(size):
-    rand = random.Random()
-    result = bytearray(size)
-    for i in range(size):
-        result[i] = int(rand.random()*255)  # random() is consistent between python 2 and 3
-    return bytes(result)
+# ----------------------------------------------------------------------------------
+# MIT License
+#
+# Copyright(c) Microsoft Corporation. All rights reserved.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# ----------------------------------------------------------------------------------
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
 
-def run():
-    account_name = 'chamsslab1'
-    account_key = '7djNLuYhp9BMtKKopXZu5EhK77QMCvO+Mw9TuplkQacNDFoZzeEh2TKcUMuJCnIa4aYAiDOet32A+AStTivShg=='
 
-    # set up the service client with the credentials from the environment variables
-    service_client = DataLakeServiceClient(account_url="{}://{}.dfs.core.windows.net".format(
-        "https",
-        account_name
-    ), credential=account_key)
-
-    # generate a random name for testing purpose
-    fs_name = "testfs{}".format(random.randint(1, 1000))
-    print("Generating a test filesystem named '{}'.".format(fs_name))
-
-    # create the filesystem
-    filesystem_client = service_client.create_file_system(file_system=fs_name)
-
-  
-# storage_account_key = '7djNLuYhp9BMtKKopXZu5EhK77QMCvO+Mw9TuplkQacNDFoZzeEh2TKcUMuJCnIa4aYAiDOet32A+AStTivShg=='
-# storage_account_name = 'chamsslab1'
-# connection_string = "GRAB_IT_FROM_AZURE_PORTAL"
-# container_name = "testfs183"
-# def uploadToBlobStorage(file_path,file_name):
-#    blob_service_client = BlobServiceClient.from_connection_string(connection_string)
-#    blob_client = blob_service_client.get_blob_client(container=container_name, blob=file_name)
-#    with open(file_path,”rb”) as data:
-#       blob_client.upload_blob(data)
-#       print(f”Uploaded {file_name}.”)
-# # calling a function to perform upload
-# uploadToBlobStorage('PATH_OF_FILE_TO_UPLOAD','FILE_NAME')
+import os, uuid, sys
+from azure.storage.blob import BlockBlobService, PublicAccess
 
 
+def run_sample():
+    try:
+        # Create the BlockBlockService that is used to call the Blob service for the storage account
+        block_blob_service = BlockBlobService(account_name = 'chamsslab1',account_key = '7djNLuYhp9BMtKKopXZu5EhK77QMCvO+Mw9TuplkQacNDFoZzeEh2TKcUMuJCnIa4aYAiDOet32A+AStTivShg==')
+
+        # Create a container called 'quickstartblobs'.
+        container_name ='quickstartblobs'
+        block_blob_service.create_container(container_name)
+
+        # Set the permission so the blobs are public.
+        block_blob_service.set_container_acl(container_name, public_access=PublicAccess.Container)
+
+        # Create a file in Documents to test the upload and download.
+        local_path=os.path.abspath(os.path.curdir)
+        local_file_name =input("Enter file name to upload : ")
+        full_path_to_file =os.path.join(local_path, local_file_name)
+
+        # Write text to the file.
+        #file = open(full_path_to_file,  'w')
+        #file.write("Hello, World!")
+        #file.close()
+
+        print("Temp file = " + full_path_to_file)
+        print("\nUploading to Blob storage as blob" + local_file_name)
+
+        # Upload the created file, use local_file_name for the blob name
+        block_blob_service.create_blob_from_path(container_name, local_file_name, full_path_to_file)
+
+        # List the blobs in the container
+        print("\nList blobs in the container")
+        generator = block_blob_service.list_blobs(container_name)
+        for blob in generator:
+            print("\t Blob name: " + blob.name)
+
+        # Download the blob(s).
+        # Add '_DOWNLOADED' as prefix to '.txt' so you can see both files in Documents.
+        full_path_to_file2 = os.path.join(local_path, str.replace(local_file_name ,'.txt', '_DOWNLOADED.txt'))
+        print("\nDownloading blob to " + full_path_to_file2)
+        block_blob_service.get_blob_to_path(container_name, local_file_name, full_path_to_file2)
+
+        sys.stdout.write("Sample finished running. When you hit <any key>, the sample will be deleted and the sample "
+                         "application will exit.")
+        sys.stdout.flush()
+        input()
+
+        # Clean up resources. This includes the container and the temp files
+        block_blob_service.delete_container(container_name)
+        os.remove(full_path_to_file)
+        os.remove(full_path_to_file2)
+    except Exception as e:
+        print(e)
+
+
+# Main method.
 if __name__ == '__main__':
-    run()
+    run_sample()
+
+
